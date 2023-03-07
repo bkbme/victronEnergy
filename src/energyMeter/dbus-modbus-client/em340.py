@@ -46,5 +46,6 @@ models = {
 
 probe.add_handler(probe.ModelRegister(Reg_u16(0x000b), models, 
 	          methods=['rtu'],
-		  units=[1]))
+		  units=[1],
+		  rates=[115200]))
 
