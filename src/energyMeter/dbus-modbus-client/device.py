@@ -2,7 +2,7 @@ from copy import copy
 import dbus
 from functools import partial
 from pymodbus.client.sync import *
-from pymodbus.register_read_message import ReadHoldingRegistersResponse
+from pymodbus.register_read_message import ReadHoldingRegistersResponse, ReadInputRegistersResponse
 import logging
 import os
 import time
@@ -79,12 +79,18 @@ class ModbusDevice(object):
         return 'Modbus'
 
     def read_register(self, reg):
-        rr = self.modbus.read_holding_registers(reg.base, reg.count,
-                                                unit=self.unit)
-
-        if not isinstance(rr, ReadHoldingRegistersResponse):
-            log.error('Error reading register %#04x: %s', reg.base, rr)
-            raise Exception(rr)
+        if(reg.read_function_code == 4):
+            rr = self.modbus.read_input_registers(reg.base, reg.count,
+                                                    unit=self.unit)
+            if not isinstance(rr, ReadInputRegistersResponse):
+                log.error('Error reading register %#04x: %s', reg.base, rr)
+                raise Exception(rr)
+        else:
+            rr = self.modbus.read_holding_registers(reg.base, reg.count,
+                                                    unit=self.unit)
+            if not isinstance(rr, ReadHoldingRegistersResponse):
+                log.error('Error reading register %#04x: %s', reg.base, rr)
+                raise Exception(rr)
 
         reg.decode(rr.registers)
         return reg.value
@@ -113,14 +119,21 @@ class ModbusDevice(object):
         start = regs[0].base
         count = regs[-1].base + regs[-1].count - start
 
-        rr = self.modbus.read_holding_registers(start, count, unit=self.unit)
+        if(regs[0].read_function_code == 4):
+            rr = self.modbus.read_input_registers(start, count, unit=self.unit)
+
+            if not isinstance(rr, ReadInputRegistersResponse):
+                log.error('Error reading register %#04x: %s', reg.base, rr)
+                raise Exception(rr)
+        else:
+            rr = self.modbus.read_holding_registers(start, count, unit=self.unit)
+
+            if not isinstance(rr, ReadHoldingRegistersResponse):
+                log.error('Error reading registers %#04x-%#04x: %s',
+                          start, start + count - 1, rr)
+                raise Exception(rr)
 
         latency = time.time() - now
-
-        if not isinstance(rr, ReadHoldingRegistersResponse):
-            log.error('Error reading registers %#04x-%#04x: %s',
-                      start, start + count - 1, rr)
-            raise Exception(rr)
 
         for reg in regs:
             base = reg.base - start

@@ -14,7 +14,7 @@ class Reg(object):
     def __new__(cls, *args, **kwargs):
         return super(Reg, cls).__new__(cls)
 
-    def __init__(self, base, count, name=None, text=None, write=False):
+    def __init__(self, base, count, name=None, text=None, write=False, rfc=3):
         self.base = base
         self.count = count
         self.name = name
@@ -22,6 +22,7 @@ class Reg(object):
         self.write = write
         self.time = 0
         self.max_age = AGE_LIMITS.get(name, AGE_LIMIT_DEFAULT)
+        self.read_function_code = rfc
         if isinstance(text, list):
             self.text = { i : text[i] for i in range(len(text)) }
         else:
@@ -56,8 +57,8 @@ class Reg(object):
         return newval != old
 
 class Reg_num(Reg, float):
-    def __init__(self, base, count, name=None, scale=1, text=None, write=False):
-        Reg.__init__(self, base, count, name, text, write)
+    def __init__(self, base, count, name=None, scale=1, text=None, write=False, rfc=3):
+        Reg.__init__(self, base, count, name, text, write, rfc)
         self.scale = float(scale) if scale != 1 else scale
 
     def set_raw_value(self, val):
@@ -110,6 +111,12 @@ class Reg_f32l(Reg_num):
     def __init__(self, base, *args, **kwargs):
         super(Reg_f32l, self).__init__(base, 2, *args, **kwargs)
         self.coding = ('<f', '<2H')
+        self.scale = float(self.scale)
+
+class Reg_f32b(Reg_num):
+    def __init__(self, base, *args, **kwargs):
+        super(Reg_f32b, self).__init__(base, 2, *args, **kwargs)
+        self.coding = ('>f', '>2H')
         self.scale = float(self.scale)
 
 class Reg_e16(Reg, int):
