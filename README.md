@@ -8,7 +8,8 @@ RS485 USB adapter: https://amzn.to/3Jw5lL8 (the version with FT232RL chip, curre
 
 So why spend so much on an ET340 that has no display?
 
-Place code in /opt/victronenergy/.
+First set your meter to 19200 baud (see manual).
+Second place code in /opt/victronenergy/.
 
 ## Testing
 1. Make sure that your USB adapter is ignored: \
