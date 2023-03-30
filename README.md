@@ -6,7 +6,8 @@ The default meter password is 1000 if anyone else needs it.
 Tested with the following equipment:
 
 Counter: https://amzn.to/3JQkkja (currently only costs 62.50 EUR)
-it should also work with the cheaper https://amzn.to/3KkEROl (without MID, currently 54 EUR)
+
+it should also work with the cheaper https://amzn.to/3KkEROl (without MID certification, currently 54 EUR)
 
 RS485 USB adapter: https://amzn.to/3Jw5lL8 (the version with FT232RL chip, currently 18.50 EUR)
 
