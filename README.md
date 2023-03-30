@@ -3,7 +3,9 @@ Code for Victron Energy Venus OS v2.93. / also tested on v3.00~22
 
 The default meter password is 1000 if anyone else needs it.
 Tested with the following equipment:
+
 Counter: https://amzn.to/3LBlkum (currently only costs 51.50 EUR)
+
 RS485 USB adapter: https://amzn.to/3Jw5lL8 (the version with FT232RL chip, currently 18.50 EUR)
 
 So why spend so much on an ET340 that has no display?
