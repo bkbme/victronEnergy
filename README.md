@@ -1,4 +1,4 @@
-# victronEnergy
+# victronEnergy SDM72D-M-2 MID Modbus ESS driver
 Code for Victron Energy Venus OS v2.93. / also tested on v3.00~22
 
 The default meter password is 1000 if anyone else needs it.
