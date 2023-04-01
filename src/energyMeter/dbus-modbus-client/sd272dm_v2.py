@@ -56,8 +56,13 @@ models = {
   }
 }
 
+#TCP-IP LAN Access
+#probe.add_handler(probe.ModelRegister(0xfc02, models,
+#                                      methods=['tcp'],
+#                                      units=[1]))
+
+#USB Access
 probe.add_handler(probe.ModelRegister(Reg_u16(0xfc02), models, 
 	          methods=['rtu'],
 		  units=[1],
 		  rates=[19200]))
-
