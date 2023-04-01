@@ -25,7 +25,8 @@ import ev_charger
 import smappee
 import abb
 import em340
-import sd272dm_v2
+import sd272dm_v2 # DRIVER 1
+# import TWE_Eastron_SDM72D # DRIVER 2 (see Updates at https://community.victronenergy.com/idea/114716/power-meter-lib-for-modbus-rtu-based-meters-from-a.html )
 
 import logging
 log = logging.getLogger()
