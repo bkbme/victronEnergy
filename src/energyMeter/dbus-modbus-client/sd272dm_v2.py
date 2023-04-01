@@ -4,7 +4,7 @@ import probe
 from register import *
 
 class SDM272DM_V2_Meter(device.EnergyMeter):
-  productid = 0x0089
+  productid = 0xb023
   productname = 'SDM272DM-V2'
   min_timeout = 0.5
 
@@ -50,7 +50,7 @@ class SDM272DM_V2_Meter(device.EnergyMeter):
     self.data_regs = regs
 
 models = {
-  0x0089: {
+  0xb023: {
     'model': 'Eastron SDM72DM-V2',
     'handler': SDM272DM_V2_Meter,
   }
