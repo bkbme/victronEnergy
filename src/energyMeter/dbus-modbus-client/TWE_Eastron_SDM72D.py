@@ -55,21 +55,21 @@ class Eastron_SDM72Dv2(device.EnergyMeter):
         ]
         return regs
 
-
     def device_init(self):
-
         self.read_info()
 
         phases = nr_phases[int(self.info['/PhaseConfig'])]
-
+		
         regs = [
-            Reg_f32b(0x0034, '/Ac/Power',          1, '%.1f W'),
-            Reg_f32b(0x0030, '/Ac/Current',        1, '%.1f A'),
-            Reg_f32b(0x0046, '/Ac/Frequency',      1, '%.1f Hz'),
-            Reg_f32b(0x0048, '/Ac/Energy/Forward', 1, '%.1f kWh'),
-            Reg_f32b(0x004a, '/Ac/Energy/Reverse', 1, '%.1f kWh'),
-            Reg_f32b(0x0156, '/Ac/Energy/Total',   1, '%.1f kWh'),
-            Reg_f32b(0x018C, '/Ac/Energy/Net',     1, '%.1f kWh'),
+             Reg_f32b(0x0034, '/Ac/Power',          1, '%.1f W'),
+             Reg_f32b(0x0030, '/Ac/Current',        1, '%.1f A'),
+             Reg_f32b(0x0046, '/Ac/Frequency',      1, '%.1f Hz'),
+             Reg_f32b(0x0048, '/Ac/Energy/Forward', 1, '%.1f kWh'),
+             Reg_f32b(0x004a, '/Ac/Energy/Reverse', 1, '%.1f kWh'),
+#            Reg_f32b(0x004a, '/Ac/Energy/Exported/Active', 1, '%.1f kWh'),
+#            Reg_f32b(0x0048, '/Ac/Energy/Imported/Active', 1, '%.1f kWh'),
+#            Reg_f32b(0x018c, '/Ac/Energy/Net',     1, '%.1f kWh'),
+#	    Reg_f32b(0x0156, '/Ac/Energy/Total',   1, '%.1f kWh'),
         ]
 
         for n in range(1, phases + 1):
@@ -79,8 +79,6 @@ class Eastron_SDM72Dv2(device.EnergyMeter):
 
     def get_ident(self):
         return 'cg_%s' % self.info['/Serial']
-
-
 
 # identifier to be checked, if register identical on all SDM630 (only first 16 bytes in u16b of 32 bit register 0xfc02)
 models = {
