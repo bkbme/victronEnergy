@@ -32,7 +32,7 @@ phase_configs = [
 class Eastron_SDM72Dv2(device.EnergyMeter):
     productid = 0xb023 # id assigned by Victron Support
     productname = 'Eastron SDM72Dv2'
-    min_timeout = 0.5
+    min_timeout = 0.1
 
     def __init__(self, *args):
         super(Eastron_SDM72Dv2, self).__init__(*args)
