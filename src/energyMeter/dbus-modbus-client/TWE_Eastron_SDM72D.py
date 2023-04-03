@@ -7,6 +7,12 @@
 # Thanks to Victron for their open platform and especially for the support of Matthijs Vader
 # For any usage a donation to seashepherd.org with an amount of 5 USD/EUR/GBP or equivalent is expected
 
+# Tested with the following equipment:
+# Smartmeter: https://amzn.to/3JQkkja (currently only costs 62.50 EUR)
+# it should also work with the cheaper https://amzn.to/3KkEROl (without MID certification, currently 54 EUR)
+# RS485 USB adapter: https://amzn.to/3Jw5lL8 (the version with FT232RL chip, currently 18.50 EUR)
+# First set your meter to 19200 baud (see manual). The default meter password is 1000. Second place code in /opt/victronenergy/.
+
 import logging
 import TWE_Eastron_device as device
 import probe
