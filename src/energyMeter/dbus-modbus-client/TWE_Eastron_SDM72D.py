@@ -79,8 +79,6 @@ class Eastron_SDM72Dv2(device.EnergyMeter):
     def get_ident(self):
         return 'cg_%s' % self.info['/Serial']
 
-
-
 # identifier to be checked, if register identical on all SDM630 (only first 16 bytes in u16b of 32 bit register 0xfc02)
 models = {
     137: {
