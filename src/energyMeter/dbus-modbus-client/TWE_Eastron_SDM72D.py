@@ -64,10 +64,10 @@ class Eastron_SDM72Dv2(device.EnergyMeter):
             Reg_f32b(0x0034, '/Ac/Power',           1, '%.1f W', rfc=4),              
             Reg_f32b(0x0030, '/Ac/Current',         1, '%.1f A', rfc=4),              
             Reg_f32b(0x0046, '/Ac/Frequency',       1, '%.1f Hz', rfc=4),                         
-            Reg_f32b(0x0048, '/Ac/Energy/Forward',  1, '%.1f kWh', rfc=4),            
-            Reg_f32b(0x004a, '/Ac/Energy/Reverse',  1, '%.1f kWh', rfc=4),            
+            Reg_f32b(0x004a, '/Ac/Energy/Forward',  1, '%.1f kWh', rfc=4),            
+            Reg_f32b(0x0048, '/Ac/Energy/Reverse',  1, '%.1f kWh', rfc=4),            
             Reg_f32b(0x0156, '/Ac/Energy/Total',    1, '%.1f kWh', rfc=4),            
-            Reg_f32b(0x018C, '/Ac/Energy/Net',      1, '%.1f kWh', rfc=4),   
+            Reg_f32b(0x018C, '/Ac/Energy/Net',      1, '%.1f kWh', rfc=4), 
         ]
 
         for n in range(1, phases + 1):
