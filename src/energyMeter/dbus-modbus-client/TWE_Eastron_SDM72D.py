@@ -2,14 +2,14 @@
 # might work also with other Eastron devices > Product code on 0xfc02 (type u16b) to be added into models overview
 # 
 # Community contribution by Thomas Weichenberger
-# Version 1.4 - 2022-02-13 - Victron VRM Portal fixed 2023-04-03 by christian1980nrw
+# Version 1.4 - 2022-02-13 - Victron VRM Portal fixed 2023-04-03 by chistian1980nrw
 #
 # Thanks to Victron for their open platform and especially for the support of Matthijs Vader
 # For any usage a donation to seashepherd.org with an amount of 5 USD/EUR/GBP or equivalent is expected
 
 # Tested with the following equipment:
-# Smartmeter: SDM72DM-V2 (MID 2023) https://amzn.to/3JQkkja (currently only costs 62.50 EUR)
-# it should also work with the cheaper https://amzn.to/3KkEROl (without MID certification, currently 54 EUR)
+# Smartmeter: SDM72DM-V2 (MID 2023) https://amzn.to/3JQkkja (currently only costs 62.50 EUR).
+# It should also work with the cheaper https://amzn.to/3KkEROl (without MID certification, currently 54 EUR).
 # RS485 USB adapter: https://amzn.to/3Jw5lL8 (the version with FT232RL chip, currently 18.50 EUR)
 # First set your meter to 19200 baud (see manual). The default meter password is 1000. Second place code in /opt/victronenergy/.
 
