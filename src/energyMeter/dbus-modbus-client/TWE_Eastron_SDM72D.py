@@ -61,8 +61,6 @@ class Eastron_SDM72Dv2(device.EnergyMeter):
             Reg_f32b(0x0000 + s, '/Ac/L%d/Voltage' % n,        1, '%.1f V'),
             Reg_f32b(0x0006 + s, '/Ac/L%d/Current' % n,        1, '%.1f A'),
             Reg_f32b(0x000c + s, '/Ac/L%d/Power' % n,          1, '%.1f W'),
-            Reg_f32b(0x015a + s, '/Ac/L%d/Energy/Forward' % n, -1, '%.1f kWh'),
-            Reg_f32b(0x0160 + s, '/Ac/L%d/Energy/Reverse' % n, 1, '%.1f kWh'),
         ]
         return regs
 
