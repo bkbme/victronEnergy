@@ -2,7 +2,7 @@
 # might work also with other Eastron devices > Product code on 0xfc02 (type u16b) to be added into models overview
 # 
 # Community contribution by Thomas Weichenberger
-# Version 1.4 - 2022-02-13 - Victron VRM Portal fixed 2023-04-03 by chistian1980nrw
+# Version 1.4 - 2022-02-13 - Victron VRM Portal fixed 2023-04-07 by chistian1980nrw
 #
 # Thanks to Victron for their open platform and especially for the support of Matthijs Vader
 # For any usage a donation to seashepherd.org with an amount of 5 USD/EUR/GBP or equivalent is expected
