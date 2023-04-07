@@ -82,7 +82,7 @@ class Eastron_SDM72Dv2(device.EnergyMeter):
 	
  # This meter (SDM72 V2) has no separate total-kWh register for L1, L2, L3 / we will use L1 only.
  # 0x018C contains import and export, so no need for /Ac/Energy/Reverse and /Ac/L1/Energy/Reverse.
- # see https://github.com/reaper7/SDM_Energy_Meter/blob/master/SDM.h#L202
+ # Registers list for SDM devices see https://github.com/reaper7/SDM_Energy_Meter/blob/master/SDM.h#L202
  # VRM Portal statistics are OK with this.
 
         for n in range(1, phases + 1):
