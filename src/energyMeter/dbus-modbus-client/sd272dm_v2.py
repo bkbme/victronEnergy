@@ -4,7 +4,7 @@ import probe
 from register import *
 
 class SDM272DM_V2_Meter(device.EnergyMeter):
-  productid = 0xb023
+  productid = 0x0089
   productname = 'SDM272DM-V2'
   min_timeout = 0.5
 
@@ -16,17 +16,21 @@ class SDM272DM_V2_Meter(device.EnergyMeter):
 
   def get_ident(self):
     return 'cg_sd272dm'
+    
+ # This meter (SDM72 V2) has no separate total-kWh register for L1, L2, L3 / we will use L1 only.
+ # 0x018C contains import and export, so no need for /Ac/Energy/Reverse and /Ac/L1/Energy/Reverse.
+ # see https://github.com/reaper7/SDM_Energy_Meter/blob/master/SDM.h#L202
+ # VRM Portal statistics are OK with this.
 
   def device_init(self):
     regs = [                                                               
             Reg_f32b(0x0034, '/Ac/Power',           1, '%.1f W', rfc=4),              
             Reg_f32b(0x0030, '/Ac/Current',         1, '%.1f A', rfc=4),              
-            Reg_f32b(0x0046, '/Ac/Frequency',       1, '%.1f Hz', rfc=4),                         
-            Reg_f32b(0x004a, '/Ac/Energy/Forward',  1, '%.1f kWh', rfc=4),            
-            Reg_f32b(0x0048, '/Ac/Energy/Reverse',  1, '%.1f kWh', rfc=4),            
-            Reg_f32b(0x0156, '/Ac/Energy/Total',    1, '%.1f kWh', rfc=4),            
-            Reg_f32b(0x018C, '/Ac/Energy/Net',      1, '%.1f kWh', rfc=4),         
-            #Reg_f32b(0x00e0, '/Ac/NeutralCurrent',  1, '%.1f Hz', rfc=4),                       
+            Reg_f32b(0x0046, '/Ac/Frequency',       1, '%.1f Hz', rfc=4),             
+            #Reg_f32b(0x00e0, '/Ac/NeutralCurrent',  1, '%.1f Hz', rfc=4),             
+            Reg_f32b(0x018C, '/Ac/Energy/Forward',   1, '%.1f kWh', rfc=4),                             
+            Reg_f32b(0x018C, '/Ac/Energy/Net',      1, '%.1f kWh', rfc=4), 
+            Reg_f32b(0x018C, '/Ac/L1/Energy/Forward', 1, '%.1f kWh', rfc=4),             
             Reg_f32b(0x0000 + 0, '/Ac/L1/Voltage',  1, '%.1f V', rfc=4),  
             Reg_f32b(0x0006 + 0, '/Ac/L1/Current',  1, '%.1f A', rfc=4),  
             Reg_f32b(0x000c + 0, '/Ac/L1/Power',    1, '%.1f W', rfc=4),  
@@ -45,12 +49,11 @@ class SDM272DM_V2_Meter(device.EnergyMeter):
             #Reg_f32b(0x0012 + 2, '/Ac/L3/ApparentPower',    1, '%.1f W', rfc=4),  
             #Reg_f32b(0x0018 + 2, '/Ac/L3/ReactivePower',    1, '%.1f W', rfc=4),  
             #Reg_f32b(0x001e + 2, '/Ac/L3/PowerFactor',    1, '%.1f W', rfc=4),  
-
           ]
     self.data_regs = regs
 
 models = {
-  0xb023: {
+  0x0089: {
     'model': 'Eastron SDM72DM-V2',
     'handler': SDM272DM_V2_Meter,
   }
