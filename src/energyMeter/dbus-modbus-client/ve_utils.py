@@ -171,7 +171,7 @@ def get_product_id():
 
 	# First try calling the venus utility script
 	try:
-		return check_output("/usr/bin/product-id").strip()
+		return check_output("/usr/bin/product-id").strip().decode('UTF-8')
 	except (CalledProcessError, OSError):
 		pass
 
@@ -182,7 +182,9 @@ def get_product_id():
 		'Venus GX': 'C002',
 		'Octo GX': 'C006',
 		'EasySolar-II': 'C007',
-		'MultiPlus-II': 'C008'
+		'MultiPlus-II': 'C008',
+		'Maxi GX': 'C009',
+		'Cerbo GX': 'C00A'
 	}.get(name, 'C003') # C003 is Generic
 
 
@@ -258,3 +260,17 @@ def unwrap_dbus_value(val):
 	if isinstance(val, dbus.Boolean):
 		return bool(val)
 	return val
+
+# When supported, only name owner changes for the the given namespace are reported. This
+# prevents spending cpu time at irrelevant changes, like scripts accessing the bus temporarily.
+def add_name_owner_changed_receiver(dbus, name_owner_changed, namespace="com.victronenergy"):
+	# support for arg0namespace is submitted upstream, but not included at the time of
+	# writing, Venus OS does support it, so try if it works.
+	if namespace is None:
+		dbus.add_signal_receiver(name_owner_changed, signal_name='NameOwnerChanged')
+	else:
+		try:
+			dbus.add_signal_receiver(name_owner_changed,
+				signal_name='NameOwnerChanged', arg0namespace=namespace)
+		except TypeError:
+			dbus.add_signal_receiver(name_owner_changed, signal_name='NameOwnerChanged')

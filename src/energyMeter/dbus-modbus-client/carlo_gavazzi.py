@@ -38,7 +38,7 @@ switch_positions = [
     'Locked',
 ]
 
-class EM24_Meter(device.EnergyMeter):
+class EM24_Meter(device.CustomName, device.EnergyMeter):
     productid = 0xb017
     productname = 'Carlo Gavazzi EM24 Ethernet Energy Meter'
     min_timeout = 0.5
@@ -95,6 +95,7 @@ class EM24_Meter(device.EnergyMeter):
             regs += self.phase_regs(n)
 
         self.data_regs = regs
+        self.nr_phases = phases
 
     def dbus_write_register(self, reg, path, val):
         super(EM24_Meter, self).dbus_write_register(reg, path, val)

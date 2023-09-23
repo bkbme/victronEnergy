@@ -14,6 +14,7 @@ from vedbus import VeDbusService
 from gi.repository import GLib
 
 import device
+import devspec
 import mdns
 import probe
 from scan import *
@@ -24,21 +25,21 @@ import carlo_gavazzi
 import ev_charger
 import smappee
 import abb
-import em340
+import comap
+import victron_em
 import sd272dm_v2
 
 import logging
 log = logging.getLogger()
 
 NAME = os.path.basename(__file__)
-VERSION = '1.24'
+VERSION = '1.35'
 
 __all__ = ['NAME', 'VERSION']
 
 pymodbus.constants.Defaults.Timeout = 0.5
 
 MODBUS_TCP_PORT = 502
-MODBUS_TCP_UNIT = 1
 
 MAX_ERRORS = 5
 FAILED_INTERVAL = 10
@@ -127,12 +128,15 @@ class Client(object):
                     os._exit(1)
                 self.devices.remove(dev)
                 if not dev.nosave:
-                    self.failed.append(str(dev))
+                    self.failed.append(dev.spec)
                 dev.destroy()
+
+    def probe_filter(self, dev):
+        return dev not in self.devices
 
     def probe_devices(self, devlist, nosave=False):
         devs = set(devlist) - set(self.devices)
-        devs, failed = probe.probe(devs)
+        devs, failed = probe.probe(devs, filt=self.probe_filter)
 
         for d in devs:
             try:
@@ -140,20 +144,20 @@ class Client(object):
                 d.nosave = nosave
                 self.devices.append(d)
             except:
-                failed.append(str(d))
+                failed.append(d.spec)
                 d.destroy()
 
         return failed
 
     def save_devices(self):
-        devs = filter(lambda d: not d.nosave, self.devices)
-        devstr = ','.join(sorted(list(map(str, devs)) + self.failed))
+        devs = list(filter(lambda d: not d.nosave, self.devices))
+        devstr = ','.join(sorted(map(str, devs + self.failed)))
         if devstr != self.settings['devices']:
             self.settings['devices'] = devstr
 
     def update_devlist(self, old, new):
-        old = set(old.split(','))
-        new = set(new.split(','))
+        old = devspec.fromstrings(filter(None, old.split(',')))
+        new = devspec.fromstrings(filter(None, new.split(',')))
         cur = set(self.devices)
         rem = old - new
 
@@ -239,13 +243,11 @@ class Client(object):
         return True
 
 class NetClient(Client):
-    def __init__(self, proto):
-        Client.__init__(self, proto)
-        self.proto = proto
+    def __init__(self):
+        Client.__init__(self, 'tcp')
 
     def new_scanner(self, full):
-        return NetScanner(self.proto, MODBUS_TCP_PORT, MODBUS_TCP_UNIT,
-                          if_blacklist)
+        return NetScanner(MODBUS_TCP_PORT, if_blacklist)
 
     def init(self, *args):
         super(NetClient, self).init(*args)
@@ -274,11 +276,7 @@ class NetClient(Client):
             self.mdns_check_time = now
             maddr = self.mdns.get_devices()
             if maddr:
-                units = probe.get_units('tcp')
-                d = []
-                for a in maddr:
-                    d += ['tcp:%s:%s:%d' % (a[0], a[1], u) for u in units]
-                self.probe_devices(d, nosave=True)
+                self.probe_devices(maddr, nosave=True)
 
         return True
 
@@ -314,6 +312,7 @@ def main():
 
     signal.signal(signal.SIGINT, lambda s, f: os._exit(1))
     faulthandler.register(signal.SIGUSR1)
+    faulthandler.enable()
 
     dbus.mainloop.glib.threads_init()
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -323,7 +322,7 @@ def main():
         tty = os.path.basename(args.serial)
         client = SerialClient(tty, args.rate, args.mode)
     else:
-        client = NetClient('tcp')
+        client = NetClient()
 
     client.err_exit = args.exit
     client.init(args.force_scan)

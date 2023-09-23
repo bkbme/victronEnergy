@@ -111,10 +111,12 @@ class CurrentTransformer(object):
     def identify(self, v):
         self.dev.write_register(Reg_u16(0x0900 + self.slot), v)
 
-class PowerBox(device.EnergyMeter):
+class PowerBox(device.CustomName, device.EnergyMeter):
     productid = 0xb018
     productname = 'Smappee Power Box'
     min_fwver = (1, 44)
+    age_limit_fast = 0
+    refresh_time = 100
 
     def __init__(self, *args):
         super(PowerBox, self).__init__(*args)
@@ -244,6 +246,8 @@ class PowerBox(device.EnergyMeter):
             self.power_regs,
             self.energy_regs,
         ]
+
+        self.nr_phases = len(self.voltage_regs)
 
         self.init_virtual()
 

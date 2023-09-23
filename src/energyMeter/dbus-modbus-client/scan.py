@@ -1,3 +1,5 @@
+from itertools import chain
+import queue
 import threading
 import logging
 import time
@@ -5,6 +7,7 @@ import traceback
 
 from utils import *
 import device
+import devspec
 import probe
 
 log = logging.getLogger()
@@ -37,13 +40,19 @@ class Scanner(object):
 
     def run(self):
         try:
+            t0 = time.time()
             self.scan()
-            log.info('Scan complete')
+            t1 = time.time()
         except ScanAborted:
-            log.info('Scan aborted')
+            pass
         except:
             log.warn('Exception during bus scan')
             traceback.print_exc()
+
+        if self.running:
+            log.info('Scan completed in %d seconds', t1 - t0)
+        else:
+            log.info('Scan aborted')
 
         self.running = False
 
@@ -67,20 +76,56 @@ class Scanner(object):
             return d
 
 class NetScanner(Scanner):
-    def __init__(self, proto, port, unit, blacklist, timeout=0.25):
+    def __init__(self, port, blacklist, timeout=0.25):
         Scanner.__init__(self)
-        self.proto = proto
+        self.protos = ['tcp', 'udp']
         self.port = port
-        self.unit = unit
         self.blacklist = blacklist
         self.timeout = timeout
 
+    def do_probe(self):
+        while True:
+            host = self.hosts.get()
+            if not host or not self.running:
+                break
+
+            m = [devspec.create(p, str(host), self.port) for p in self.protos]
+
+            try:
+                probe.probe(m, self.progress, timeout=self.timeout)
+            except:
+                pass
+
+            self.hosts.task_done()
+
     def scan(self):
-        for net in self.nets:
-            log.info('Scanning %s', net)
-            hosts = filter(net.ip.__ne__, net.network.hosts())
-            mlist = [[self.proto, str(h), self.port, self.unit] for h in hosts]
-            probe.probe(mlist, self.progress, 4, timeout=self.timeout)
+        self.hosts = queue.Queue(maxsize=8)
+        tasks = []
+
+        log.info('Scanning %s', ', '.join(map(str, self.nets)))
+
+        for i in range(8):
+            t = threading.Thread(target=self.do_probe)
+            t.start()
+            tasks.append(t)
+
+        for h in chain(*map(lambda n: filter(n.ip.__ne__, n.network.hosts()), self.nets)):
+            if not self.running:
+                break
+
+            self.hosts.put(h)
+
+        if self.running:
+            self.hosts.join()
+
+        for t in tasks:
+            if not self.hosts.full():
+                self.hosts.put(None)
+
+        for t in tasks:
+            t.join()
+
+        self.hosts = None
 
     def start(self):
         self.nets = get_networks(self.blacklist)
@@ -88,7 +133,8 @@ class NetScanner(Scanner):
             log.warn('Unable to get network addresses')
             return False
 
-        self.total = sum([n.network.num_addresses - 3 for n in self.nets])
+        num_hosts = sum([n.network.num_addresses - 3 for n in self.nets])
+        self.total = len(self.protos) * num_hosts
 
         return Scanner.start(self)
 
@@ -107,7 +153,7 @@ class SerialScanner(Scanner):
             time.sleep(1)
 
     def scan_units(self, units, rate):
-        mlist = [[self.mode, self.tty, rate, u] for u in units]
+        mlist = [devspec.create(self.mode, self.tty, rate, u) for u in units]
         d = probe.probe(mlist, self.progress, 1, timeout=self.timeout)
         return d[0]
 

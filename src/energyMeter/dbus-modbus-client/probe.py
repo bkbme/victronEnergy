@@ -1,133 +1,25 @@
 import logging
-import os
 import struct
-import threading
 import time
-import traceback
 
-from pymodbus.client.sync import *
 from pymodbus.register_read_message import ReadHoldingRegistersResponse
-from pymodbus.utilities import computeCRC
 
+import client
 import utils
 
 log = logging.getLogger()
 
 device_types = []
-serial_ports = {}
 
-class RefCount(object):
-    def __init__(self, *args, **kwargs):
-        super(RefCount, self).__init__(*args, **kwargs)
-        self.refcount = 1
-        self.in_transaction = False
-
-    def get(self):
-        self.refcount += 1
-        return self
-
-    def put(self):
-        if self.refcount > 0:
-            self.refcount -= 1
-        if self.refcount == 0:
-            self.close()
-
-    def close(self):
-        if self.refcount == 0 or self.in_transaction:
-            super(RefCount, self).close()
-
-    def execute(self, *args):
-        try:
-            self.in_transaction = True
-            return super(RefCount, self).execute(*args)
-        finally:
-            self.in_transaction = False
-
-class TcpClient(RefCount, ModbusTcpClient):
-    pass
-
-class UdpClient(RefCount, ModbusUdpClient):
-    pass
-
-class SerialClient(RefCount, ModbusSerialClient):
-    def __init__(self, *args, **kwargs):
-        super(SerialClient, self).__init__(*args, **kwargs)
-        self.lock = threading.RLock()
-
-    def __setattr__(self, name, value):
-        super(SerialClient, self).__setattr__(name, value)
-        if name == 'timeout' and self.socket:
-            self.socket.timeout = value
-
-    def put(self):
-        super(SerialClient, self).put()
-        if self.refcount == 0:
-            del serial_ports[os.path.basename(self.port)]
-
-    def execute(self, request=None):
-        with self.lock:
-            return super(SerialClient, self).execute(request)
-
-    def __enter__(self):
-        self.lock.acquire()
-        return super(SerialClient, self).__enter__()
-
-    def __exit__(self, *args):
-        super(SerialClient, self).__exit__(*args)
-        self.lock.release()
-
-def make_modbus(m):
-    method = m[0]
-
-    if method == 'tcp':
-        return TcpClient(m[1], int(m[2]))
-
-    if method == 'udp':
-        return UdpClient(m[1], int(m[2]))
-
-    tty = m[1]
-    rate = int(m[2])
-
-    if tty in serial_ports:
-        client = serial_ports[tty]
-        if client.baudrate != rate:
-            raise Exception('rate mismatch on %s' % tty)
-        return client.get()
-
-    dev = '/dev/%s' % tty
-    client = SerialClient(method, port=dev, baudrate=rate)
-    if not client.connect():
-        client.put()
-        return None
-
-    serial_ports[tty] = client
-
-    # send some harmless messages to the broadcast address to
-    # let rate detection in devices adapt
-    packet = bytes([0x00, 0x08, 0x00, 0x00, 0x55, 0x55])
-    packet += struct.pack('>H', computeCRC(packet))
-
-    for i in range(12):
-        client.socket.write(packet)
-        time.sleep(0.1)
-
-    return client
-
-def probe(mlist, pr_cb=None, pr_interval=10, timeout=None):
+def probe(mlist, pr_cb=None, pr_interval=10, timeout=None, filt=None):
     num_probed = 0
     found = []
     failed = []
 
     for m in mlist:
-        if isinstance(m, (str, type(u''))):
-            m = m.split(':')
-
-        if len(m) < 4:
-            continue
-
         try:
-            modbus = make_modbus(m)
-            unit = int(m[-1])
+            modbus = client.make_client(m)
+            unit = m.unit
         except:
             continue
 
@@ -137,25 +29,35 @@ def probe(mlist, pr_cb=None, pr_interval=10, timeout=None):
         d = None
 
         for t in device_types:
-            if t.methods and m[0] not in t.methods:
+            if t.methods and m.method not in t.methods:
                 continue
 
+            units = [unit] if unit > 0 else t.units
+
             try:
-                t0 = time.time()
-                d = t.probe(modbus, unit, timeout)
-                t1 = time.time()
-            except Exception as ex:
+                for u in units:
+                    mm = m._replace(unit=u)
+
+                    if filt and not filt(mm):
+                        continue
+
+                    t0 = time.time()
+                    d = t.probe(mm, modbus, timeout)
+                    t1 = time.time()
+                    if d:
+                        break
+            except:
                 break
 
             if d:
                 log.info('Found %s at %s', d.model, d)
-                d.method = m[0]
                 d.latency = t1 - t0
+                d.timeout = max(d.min_timeout, d.latency * 4)
                 found.append(d)
                 break
 
         if not d:
-            failed.append(':'.join(map(str, m)))
+            failed.append(m)
 
         modbus.put()
         num_probed += 1
@@ -198,12 +100,12 @@ class ModelRegister(object):
         self.units = args.get('units', [])
         self.rates = args.get('rates', [])
 
-    def probe(self, modbus, unit, timeout=None):
+    def probe(self, spec, modbus, timeout=None):
         with modbus, utils.timeout(modbus, timeout or self.timeout):
             if not modbus.connect():
                 raise Exception('connection error')
             rr = modbus.read_holding_registers(self.reg.base, self.reg.count,
-                unit=unit)
+                unit=spec.unit)
 
         if not isinstance(rr, ReadHoldingRegistersResponse):
             log.debug('%s: %s', modbus, rr)
@@ -212,4 +114,4 @@ class ModelRegister(object):
         self.reg.decode(rr.registers)
         if self.reg.value in self.models:
             m = self.models[self.reg.value]
-            return m['handler'](modbus, unit, m['model'])
+            return m['handler'](spec, modbus, m['model'])

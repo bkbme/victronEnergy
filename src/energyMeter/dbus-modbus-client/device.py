@@ -1,7 +1,6 @@
 from copy import copy
 import dbus
 from functools import partial
-from pymodbus.client.sync import *
 from pymodbus.register_read_message import ReadHoldingRegistersResponse, ReadInputRegistersResponse
 import logging
 import os
@@ -19,10 +18,16 @@ log = logging.getLogger()
 
 class ModbusDevice(object):
     min_timeout = 0.1
+    refresh_time = None
+    age_limit = 4
+    age_limit_fast = 1
+    fast_regs = ('/Ac/L1/Power', '/Ac/L2/Power', '/Ac/L3/Power', '/Ac/Power')
 
-    def __init__(self, modbus, unit, model):
+    def __init__(self, spec, modbus, model):
+        self.spec = spec
         self.modbus = modbus.get()
-        self.unit = unit
+        self.method = modbus.method
+        self.unit = spec.unit
         self.model = model
         self.role = None
         self.info = {}
@@ -43,53 +48,40 @@ class ModbusDevice(object):
         self.modbus.put()
 
     def __eq__(self, other):
-        if isinstance(other, type(self)):
-            return str(self) == str(other)
-        if isinstance(other, (str, type(u''))):
-            return str(self) == other
-        return False
+        return str(self) == str(other)
 
     def __hash__(self):
-        return hash(str(self))
+        return hash(self.spec)
 
     def __str__(self):
-        if isinstance(self.modbus, ModbusTcpClient):
-            return 'tcp:%s:%d:%d' % (self.modbus.host,
-                                     self.modbus.port,
-                                     self.unit)
-        elif isinstance(self.modbus, ModbusUdpClient):
-            return 'udp:%s:%d:%d' % (self.modbus.host,
-                                     self.modbus.port,
-                                     self.unit)
-        elif isinstance(self.modbus, ModbusSerialClient):
-            return '%s:%s:%d:%d' % (self.modbus.method,
-                                    os.path.basename(self.modbus.port),
-                                    self.modbus.baudrate,
-                                    self.unit)
-        return str(self.modbus)
+        return str(self.spec)
 
     def connection(self):
-        if isinstance(self.modbus, (ModbusTcpClient, ModbusUdpClient)):
+        if self.method == 'tcp':
             return 'Modbus %s %s' % (self.method.upper(),
                                      self.modbus.socket.getpeername()[0])
-        elif isinstance(self.modbus, ModbusSerialClient):
-            return 'Modbus %s %s:%d' % (self.modbus.method.upper(),
+        elif self.method == 'udp':
+            return 'Modbus %s %s' % (self.method.upper(),
+                                     self.modbus.host)
+        elif self.method in ['rtu', 'ascii']:
+            return 'Modbus %s %s:%d' % (self.method.upper(),
                                         os.path.basename(self.modbus.port),
                                         self.unit)
         return 'Modbus'
 
     def read_register(self, reg):
         if(reg.read_function_code == 4):
-            rr = self.modbus.read_input_registers(reg.base, reg.count,
+            rr = self.modbus.read_holding_registers(reg.base, reg.count,
                                                     unit=self.unit)
-            if not isinstance(rr, ReadInputRegistersResponse):
+
+            if not isinstance(rr, ReadHoldingRegistersResponse):
                 log.error('Error reading register %#04x: %s', reg.base, rr)
                 raise Exception(rr)
         else:
             rr = self.modbus.read_holding_registers(reg.base, reg.count,
                                                     unit=self.unit)
             if not isinstance(rr, ReadHoldingRegistersResponse):
-                log.error('Error reading register %#04x: %s', reg.base, rr)
+                log.error('Error reading register %#04x: %s', reg.base, rr) 
                 raise Exception(rr)
 
         reg.decode(rr.registers)
@@ -141,7 +133,8 @@ class ModbusDevice(object):
 
             if now - reg.time > reg.max_age:
                 if reg.decode(rr.registers[base:end]):
-                    d[reg.name] = copy(reg) if reg.isvalid() else None
+                    if reg.name:
+                        d[reg.name] = copy(reg) if reg.isvalid() else None
                 reg.time = now
 
         return latency
@@ -155,17 +148,21 @@ class ModbusDevice(object):
             return
 
         self.settings_dbus = dbus
+        self.settings_path = '/Settings/Devices/' + self.get_ident()
 
-        path = '/Settings/Devices/' + self.get_ident()
-        role = self.role or self.default_role
         def_inst = '%s:%s' % (self.default_role, self.default_instance)
 
         SETTINGS = {
-            'instance':   [path + '/ClassAndVrmInstance', def_inst, 0, 0],
+            'instance': [self.settings_path + '/ClassAndVrmInstance', def_inst, 0, 0],
         }
 
         self.settings = SettingsDevice(dbus, SETTINGS, self.setting_changed)
-        self.role, self.devinst = self.get_role_instance()
+        role, self.devinst = self.get_role_instance()
+
+        if self.role:
+            self.settings['instance'] = '%s:%s' % (self.role, self.devinst)
+        else:
+            self.role = role
 
     def setting_changed(self, name, old, new):
         if name == 'instance':
@@ -192,7 +189,6 @@ class ModbusDevice(object):
         self.modbus.get()
         self.destroy()
         self.init(self.settings_dbus)
-        self.need_reinit = False
 
     def sched_reinit(self):
         self.need_reinit = True
@@ -244,6 +240,8 @@ class ModbusDevice(object):
         overhead = 5 + 2                # request + response
         if self.method == 'tcp':
             overhead += 2 * (20 + 7)    # TCP + MBAP
+        elif self.method == 'udp':
+            overhead += 2 * (8 + 7)     # UDP + MBAP
         elif self.method == 'rtu':
             overhead += 2 * (1 + 2)     # address + crc
 
@@ -263,6 +261,12 @@ class ModbusDevice(object):
             regs.append(rg)
 
         return regs
+
+    def set_max_age(self, reg):
+        if reg.name in self.fast_regs:
+            reg.max_age = self.age_limit_fast
+        else:
+            reg.max_age = self.age_limit
 
     def init(self, dbus):
         self.device_init()
@@ -291,15 +295,22 @@ class ModbusDevice(object):
         else:
             self.dbus.add_path('/Role', self.role)
 
+        if self.refresh_time is not None:
+            self.dbus.add_path('/RefreshTime', self.refresh_time)
+
         for p in self.info:
             self.dbus_add_register(self.info[p])
 
         for r in self.data_regs:
             for rr in r:
-                self.dbus_add_register(rr)
+                if rr.max_age is None:
+                    self.set_max_age(rr)
+                if rr.name:
+                    self.dbus_add_register(rr)
 
         self.latfilt = LatencyFilter(self.latency)
         self.device_init_late()
+        self.need_reinit = False
 
     def device_init(self):
         pass
@@ -311,6 +322,7 @@ class ModbusDevice(object):
         if self.need_reinit:
             self.reinit()
 
+        self.modbus.timeout = self.timeout
         latency = []
 
         with self.dbus as d:
@@ -321,7 +333,7 @@ class ModbusDevice(object):
 
         if latency:
             self.latency = self.latfilt.filter(latency)
-            self.modbus.timeout = max(self.min_timeout, self.latency * 4)
+            self.timeout = max(self.min_timeout, self.latency * 4)
 
 class LatencyFilter(object):
     def __init__(self, val):
@@ -344,43 +356,55 @@ class LatencyFilter(object):
 
         return self.val
 
-class EnergyMeter(ModbusDevice):
-    allowed_roles = ['grid', 'pvinverter', 'genset', 'acload']
-    default_role = 'grid'
-    default_instance = 40
-
+class CustomName:
     def customname_setting_changed(self, service, path, value):
         self.dbus['/CustomName'] = value['Value']
+
+    def init_device_settings(self, dbus):
+        super().init_device_settings(dbus)
+        self.cn_item = self.settings.addSetting(
+            self.settings_path + '/CustomName', '', 0, 0,
+            callback=self.customname_setting_changed)
+
+    def init(self, dbus):
+        super().init(dbus)
+        self.dbus.add_path('/CustomName', self.cn_item.get_value(),
+                           writeable=True,
+                           onchangecallback=self.customname_changed)
+
+    def customname_changed(self, path, val):
+        self.cn_item.set_value(val)
+        return True
+
+class EnergyMeter(ModbusDevice):
+    role_names = ['grid', 'pvinverter', 'genset', 'acload']
+    allowed_roles = role_names
+    default_role = 'grid'
+    default_instance = 40
+    nr_phases = None
 
     def position_setting_changed(self, service, path, value):
         self.dbus['/Position'] = value['Value']
 
     def init_device_settings(self, dbus):
         super(EnergyMeter, self).init_device_settings(dbus)
-        path = '/Settings/Devices/' + self.get_ident()
-        self.cn_item = self.settings.addSetting(path + '/CustomName', '', 0, 0,
-            callback=self.customname_setting_changed)
 
         self.pos_item = None
         if self.role == 'pvinverter':
-            self.pos_item = self.settings.addSetting(path + '/Position', 0, 0, 2,
+            self.pos_item = self.settings.addSetting(
+                self.settings_path + '/Position', 0, 0, 2,
                 callback=self.position_setting_changed)
 
     def init(self, dbus):
         super(EnergyMeter, self).init(dbus)
 
-        self.dbus.add_path('/CustomName', self.cn_item.get_value(),
-                           writeable=True,
-                           onchangecallback=self.customname_changed)
+        if self.nr_phases is not None:
+            self.dbus.add_path('/NrOfPhases', self.nr_phases)
 
         if self.pos_item is not None:
             self.dbus.add_path('/Position', self.pos_item.get_value(),
                                writeable=True,
                                onchangecallback=self.position_changed)
-
-    def customname_changed(self, path, val):
-        self.cn_item.set_value(val)
-        return True
 
     def position_changed(self, path, val):
         if not 0 <= val <= 2:
@@ -389,6 +413,7 @@ class EnergyMeter(ModbusDevice):
         return True
 
 __all__ = [
+    'CustomName',
     'EnergyMeter',
     'ModbusDevice',
 ]

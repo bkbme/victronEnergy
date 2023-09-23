@@ -1,27 +1,20 @@
 import struct
 from utils import get_enum
 
-AGE_LIMIT_DEFAULT = 4
-
-AGE_LIMITS = {
-    '/Ac/L1/Power': 1,
-    '/Ac/L2/Power': 1,
-    '/Ac/L3/Power': 1,
-    '/Ac/Power':    1,
-}
-
 class Reg(object):
     def __new__(cls, *args, **kwargs):
         return super(Reg, cls).__new__(cls)
 
-    def __init__(self, base, count, name=None, text=None, write=False, rfc=3):
+    def __init__(self, base, count, name=None, text=None, write=False,
+                 max_age=None, onchange=None, rfc=3):
         self.base = base
         self.count = count
         self.name = name
         self.value = None
         self.write = write
+        self.onchange = onchange
         self.time = 0
-        self.max_age = AGE_LIMITS.get(name, AGE_LIMIT_DEFAULT)
+        self.max_age = max_age
         self.read_function_code = rfc
         if isinstance(text, list):
             self.text = { i : text[i] for i in range(len(text)) }
@@ -54,18 +47,24 @@ class Reg(object):
     def update(self, newval):
         old = self.value
         self.value = newval
-        return newval != old
+        changed = newval != old
+        if self.onchange and changed:
+            self.onchange(self)
+        return changed
 
 class Reg_num(Reg, float):
-    def __init__(self, base, count, name=None, scale=1, text=None, write=False, rfc=3):
-        Reg.__init__(self, base, count, name, text, write, rfc)
+    def __init__(self, base, count, name=None, scale=1, text=None, write=False, invalid=None, **kwargs):
+        Reg.__init__(self, base, count, name, text, write, **kwargs)
         self.scale = float(scale) if scale != 1 else scale
+        self.invalid = invalid
 
     def set_raw_value(self, val):
         return self.update(type(self.scale)(val / self.scale))
 
     def decode(self, values):
         v = struct.unpack(self.coding[0], struct.pack(self.coding[1], *values))
+        if v[0] == self.invalid:
+            return self.update(None)
         return self.set_raw_value(v[0])
 
     def encode(self):
